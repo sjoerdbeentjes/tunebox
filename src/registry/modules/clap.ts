@@ -27,7 +27,7 @@ export const clapModule: ModuleDefinition<P> = {
     return {
       node: out,
       internal: { noise, bp },
-      trigger(_n, time, velocity) {
+      trigger(_notes, time, velocity) {
         // Three quick bursts for the classic clap shape.
         for (let i = 0; i < 3; i++) noise.triggerAttackRelease("16n", time + i * 0.012, velocity * 0.45);
       },

@@ -8,13 +8,15 @@ import type { z } from "zod";
 
 /**
  * Triggers one step of a module at a scheduled transport time.
- * @param note      Pitch as a Tone-compatible string ("C4"), or undefined for drums.
+ * @param notes     Pitches as Tone-compatible strings (["C4", "E4"]). 1+ for
+ *                  chords. Undefined for drums (the module ignores pitch).
+ *                  Monophonic synths should play only notes[0].
  * @param time      Web Audio time (seconds).
  * @param velocity  0..1.
  * @param duration  Note length in seconds.
  */
 export type TriggerFn = (
-  note: string | undefined,
+  notes: string[] | undefined,
   time: number,
   velocity: number,
   duration: number,

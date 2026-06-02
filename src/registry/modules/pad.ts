@@ -26,9 +26,9 @@ export const padModule: ModuleDefinition<P> = {
     return {
       node: poly,
       internal: poly,
-      trigger(note, time, velocity, duration) {
-        if (!note) return;
-        poly.triggerAttackRelease(note, duration, time, velocity * 0.4);
+      trigger(notes, time, velocity, duration) {
+        if (!notes || notes.length === 0) return;
+        poly.triggerAttackRelease(notes, duration, time, velocity * 0.4);
       },
       dispose() { poly.dispose(); },
     };

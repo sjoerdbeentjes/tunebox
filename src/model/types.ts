@@ -6,8 +6,8 @@
  * schemas (see ./schema.ts), so the core types stay stable as plugins grow.
  */
 
-/** Bumped to v2 when the schema gained per-track color/solo and per-step pitch. */
-export const PROJECT_VERSION = 2 as const;
+/** Bumped to v3 when steps gained chord support (`notes` array replaces single `note`). */
+export const PROJECT_VERSION = 3 as const;
 
 export interface Project {
   version: typeof PROJECT_VERSION;
@@ -65,12 +65,13 @@ export interface Pattern {
 }
 
 /**
- * A single step. Drums: only `active` matters. Melodic: `note` is the pitch
- * to play (e.g. "C4"); when omitted, the track's `defaultNote` is used.
+ * A single step. Drums: only `active` matters. Melodic: `notes` is the chord
+ * (one or more pitches like "C4"); when omitted, the track's `defaultNote` is
+ * used. Mono-voice instruments play only the first entry.
  */
 export interface Step {
   active: boolean;
-  note?: string;
+  notes?: string[];
   /** 0..1, defaults to 0.95 when omitted. */
   velocity?: number;
 }

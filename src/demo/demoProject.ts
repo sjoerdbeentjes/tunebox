@@ -5,9 +5,13 @@
  */
 import { PROJECT_VERSION, type Project, type Step } from "../model/types";
 
-/** Compact 16-step builder: 'x' = on, '.' = off. Optional note assigns pitch. */
+/** Compact 16-step builder: 'x' = on, '.' = off. Optional note assigns a single-note step. */
 function pat(s: string, note?: string, velocity = 0.9): Step[] {
-  return s.split("").map((c) => c === "x" ? { active: true, note, velocity } : { active: false });
+  return s.split("").map((c) =>
+    c === "x"
+      ? { active: true, notes: note ? [note] : undefined, velocity }
+      : { active: false },
+  );
 }
 
 export function demoProject(): Project {

@@ -26,7 +26,7 @@ export const tomModule: ModuleDefinition<P> = {
     return {
       node: out,
       internal: synth,
-      trigger(_n, time, velocity) {
+      trigger(_notes, time, velocity) {
         synth.triggerAttackRelease("A2", "8n", time, velocity * 0.85);
       },
       dispose() { synth.dispose(); out.dispose(); },

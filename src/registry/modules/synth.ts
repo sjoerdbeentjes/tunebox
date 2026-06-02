@@ -25,9 +25,10 @@ export const synthModule: ModuleDefinition<P> = {
     return {
       node: poly,
       internal: poly,
-      trigger(note, time, velocity, duration) {
-        if (!note) return;
-        poly.triggerAttackRelease(note, duration, time, velocity * 0.5);
+      trigger(notes, time, velocity, duration) {
+        if (!notes || notes.length === 0) return;
+        // PolySynth plays a chord when given an array.
+        poly.triggerAttackRelease(notes, duration, time, velocity * 0.5);
       },
       dispose() { poly.dispose(); },
     };

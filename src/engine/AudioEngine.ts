@@ -255,8 +255,10 @@ export class AudioEngine {
       const step = rt.steps[index];
       if (!step?.active) return;
       const duration = Tone.Time(rt.subdivision).toSeconds();
-      const note = step.note ?? rt.defaultNote;
-      rt.module.trigger(note, time, stepVelocity(step), duration);
+      const notes = step.notes && step.notes.length > 0
+        ? step.notes
+        : (rt.defaultNote ? [rt.defaultNote] : undefined);
+      rt.module.trigger(notes, time, stepVelocity(step), duration);
       // Tone.Draw schedules a UI-thread callback at audio time — used for playhead sync.
       Tone.Draw.schedule(() => emitStep(index), time);
     };

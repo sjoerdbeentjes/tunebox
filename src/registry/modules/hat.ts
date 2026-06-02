@@ -26,7 +26,7 @@ export const hatModule: ModuleDefinition<P> = {
     return {
       node: out,
       internal: { noise, hp },
-      trigger(_n, time, velocity) { noise.triggerAttackRelease("32n", time, velocity * 0.6); },
+      trigger(_notes, time, velocity) { noise.triggerAttackRelease("32n", time, velocity * 0.6); },
       dispose() { noise.dispose(); hp.dispose(); out.dispose(); },
     };
   },

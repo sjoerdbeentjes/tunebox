@@ -38,6 +38,7 @@ export default function App() {
   const toggleMute = useProjectStore((s) => s.toggleMute);
   const toggleSolo = useProjectStore((s) => s.toggleSolo);
   const setStep = useProjectStore((s) => s.setStep);
+  const setStepNotes = useProjectStore((s) => s.setStepNotes);
 
   const [booted, setBooted] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -140,7 +141,7 @@ export default function App() {
           {view === "seq" ? (
             <StepGrid
               tracks={project.tracks} step={step} selectedId={selectedId}
-              onSelect={setSelectedId} onSetStep={setStep}
+              onSelect={setSelectedId} onSetStep={setStep} onSetStepNotes={setStepNotes}
               onToggleMute={toggleMute} onToggleSolo={toggleSolo}
             />
           ) : (

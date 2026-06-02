@@ -27,7 +27,7 @@ export const kickModule: ModuleDefinition<P> = {
     const handle: ModuleHandle = {
       node: out,
       internal: synth,
-      trigger(_n, time, velocity) {
+      trigger(_notes, time, velocity) {
         synth.triggerAttackRelease("C1", "8n", time, velocity);
       },
       dispose() { synth.dispose(); out.dispose(); },

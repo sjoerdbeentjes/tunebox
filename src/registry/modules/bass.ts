@@ -2,6 +2,17 @@ import * as Tone from "tone";
 import { z } from "zod";
 import type { ModuleDefinition } from "../types";
 
+/** Return the lowest-pitched note from a chord (by frequency). */
+function lowest(notes: string[]): string {
+  let bestNote = notes[0];
+  let bestFreq = Tone.Frequency(bestNote).toFrequency();
+  for (let i = 1; i < notes.length; i++) {
+    const f = Tone.Frequency(notes[i]).toFrequency();
+    if (f < bestFreq) { bestFreq = f; bestNote = notes[i]; }
+  }
+  return bestNote;
+}
+
 const schema = z.object({});
 type P = z.infer<typeof schema>;
 
@@ -26,7 +37,9 @@ export const bassModule: ModuleDefinition<P> = {
     return {
       node: synth,
       internal: synth,
-      trigger(note, time, velocity, duration) {
+      trigger(notes, time, velocity, duration) {
+        // MonoSynth: pick the lowest pitch of the chord as the bass note.
+        const note = notes && notes.length > 0 ? lowest(notes) : undefined;
         if (!note) return;
         synth.triggerAttackRelease(note, duration, time, velocity * 0.6);
       },

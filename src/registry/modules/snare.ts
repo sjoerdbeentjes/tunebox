@@ -33,7 +33,7 @@ export const snareModule: ModuleDefinition<P> = {
     return {
       node: out,
       internal: { noise, body, hp },
-      trigger(_n, time, velocity) {
+      trigger(_notes, time, velocity) {
         noise.triggerAttackRelease("16n", time, velocity * 0.7);
         body.triggerAttackRelease("A2", "16n", time, velocity * 0.5);
       },

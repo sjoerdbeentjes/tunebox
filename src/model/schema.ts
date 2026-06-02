@@ -9,7 +9,7 @@ import { PROJECT_VERSION, type Project } from "./types";
 
 const stepSchema = z.object({
   active: z.boolean(),
-  note: z.string().optional(),
+  notes: z.array(z.string()).optional(),
   velocity: z.number().min(0).max(1).optional(),
 });
 
@@ -62,9 +62,27 @@ export const projectSchema = z.object({
   tracks: z.array(trackSchema),
 });
 
-/** Migrate older project shapes forward. No-op currently. */
+/** Migrate older project shapes forward to the current PROJECT_VERSION. */
 export function migrate(raw: unknown): unknown {
-  return raw;
+  if (typeof raw !== "object" || raw === null) return raw;
+  let p = raw as Record<string, unknown>;
+  // v2 -> v3: per-step `note: string` becomes `notes: string[]`.
+  if (p.version === 2) {
+    p = structuredClone(p);
+    const tracks = (p.tracks ?? []) as Array<Record<string, unknown>>;
+    for (const t of tracks) {
+      const pattern = t.pattern as { steps?: Array<Record<string, unknown>> } | undefined;
+      for (const s of pattern?.steps ?? []) {
+        if (typeof s.note === "string" && !Array.isArray(s.notes)) {
+          s.notes = [s.note];
+        }
+        delete s.note;
+      }
+    }
+    p.tracks = tracks;
+    p.version = 3;
+  }
+  return p;
 }
 
 export function validateProject(raw: unknown): Project {

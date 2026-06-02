@@ -286,6 +286,43 @@ button{font-family:inherit;color:inherit;cursor:pointer;border:none;background:n
 .enum-btn{padding:6px 8px;border:1px solid var(--line-bright);border-radius:2px;background:var(--bg);color:var(--grn);font-size:11px;letter-spacing:.06em;min-width:46px;}
 .enum-btn:hover{background:rgba(94,240,138,.06);}
 
+/* =========================== CHORD CELL + POPOVER =========================== */
+.cell.chord{box-shadow:0 0 8px color-mix(in srgb,var(--cc) 40%,transparent),inset 0 0 8px color-mix(in srgb,var(--cc) 18%,transparent);}
+.cell-chord-badge{
+  display:inline-block;margin-left:3px;padding:0 3px;font-size:8px;font-weight:600;line-height:11px;
+  color:#000;background:var(--cc);border-radius:2px;vertical-align:top;text-shadow:none;
+}
+
+.chord-pop{
+  background:var(--panel);border:1px solid var(--line-bright);border-radius:4px;
+  box-shadow:0 8px 32px rgba(0,0,0,.6),0 0 0 1px color-mix(in srgb,var(--cc) 25%,transparent);
+  font-family:'IBM Plex Mono','SFMono-Regular',Menlo,Consolas,monospace;color:var(--txt);
+  z-index:10000;padding:0;user-select:none;
+}
+.chord-head{
+  display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);
+  background:color-mix(in srgb,var(--cc) 6%,var(--panel-2));border-radius:4px 4px 0 0;
+}
+.chord-title{font-size:10px;letter-spacing:.16em;color:var(--muted);}
+.chord-root{font-size:16px;font-weight:600;letter-spacing:.04em;text-shadow:var(--glow) color-mix(in srgb,var(--cc) 35%,transparent);min-width:42px;}
+.chord-root-ctl{display:flex;gap:3px;margin-left:auto;}
+.chord-presets{
+  display:grid;grid-template-columns:repeat(6,1fr);gap:4px;padding:10px;border-bottom:1px solid var(--line);
+}
+.chord-preset{
+  padding:6px 4px;font-size:10px;font-weight:600;letter-spacing:.06em;
+  border:1px solid var(--line-2);border-radius:2px;color:var(--txt-2);background:var(--bg);
+}
+.chord-preset:hover{color:var(--txt);border-color:var(--line-bright);background:var(--panel-2);}
+.chord-preset.on{color:var(--cc,var(--grn));border-color:var(--cc,var(--grn-d));background:color-mix(in srgb,var(--cc) 12%,var(--bg));box-shadow:inset 0 0 8px color-mix(in srgb,var(--cc) 14%,transparent);}
+.chord-notes{display:flex;align-items:center;gap:10px;padding:9px 10px;border-bottom:1px solid var(--line);}
+.chord-notes-label{font-size:9px;letter-spacing:.14em;color:var(--muted);}
+.chord-notes-list{flex:1;display:flex;flex-wrap:wrap;gap:4px;}
+.chord-note{padding:2px 6px;font-size:11px;font-weight:600;letter-spacing:.02em;border:1px solid var(--line-bright);border-radius:2px;color:var(--txt);}
+.chord-notes-empty{color:var(--muted);font-size:11px;}
+.chord-nudge{display:flex;gap:3px;}
+.chord-hint{padding:7px 10px;font-size:9.5px;color:var(--muted);letter-spacing:.04em;}
+
 @media (max-width:880px){
   .browser{display:none;}
   .pos{font-size:20px;}

@@ -70,7 +70,7 @@ interface ProjectState {
   // pattern
   setStep(trackId: string, index: number, step: Step): void;
   toggleStep(trackId: string, index: number): void;
-  setStepNote(trackId: string, index: number, note: string): void;
+  setStepNotes(trackId: string, index: number, notes: string[]): void;
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
@@ -104,7 +104,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const steps: Step[] = t.pattern.steps.map((step) => {
         if (!step.active) return step;
         if (newKind === "drum") return { active: true, velocity: step.velocity };
-        return { active: true, note: step.note ?? newDefaultNote, velocity: step.velocity };
+        const notes = step.notes && step.notes.length > 0
+          ? step.notes
+          : (newDefaultNote ? [newDefaultNote] : undefined);
+        return { active: true, notes, velocity: step.velocity };
       });
       return {
         ...t,
@@ -164,15 +167,18 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const next: Step = cur.active
       ? { active: false }
       : isMel
-        ? { active: true, note: cur.note ?? t.defaultNote, velocity: 0.9 }
+        ? { active: true, notes: cur.notes ?? (t.defaultNote ? [t.defaultNote] : undefined), velocity: 0.9 }
         : { active: true, velocity: 0.9 };
     return { ...t, pattern: { steps: t.pattern.steps.map((c, i) => i === index ? next : c) } };
   }))),
 
-  setStepNote: (trackId, index, note) => set((s) => commit(mapTrack(s.project, trackId, (t) => ({
+  setStepNotes: (trackId, index, notes) => set((s) => commit(mapTrack(s.project, trackId, (t) => ({
     ...t,
-    defaultNote: note,
-    pattern: { steps: t.pattern.steps.map((c, i) => i === index ? { ...c, active: true, note } : c) },
+    // Track the root note (lowest pitch) so newly-clicked cells pick the same key.
+    defaultNote: notes[0] ?? t.defaultNote,
+    pattern: { steps: t.pattern.steps.map((c, i) =>
+      i === index ? { ...c, active: notes.length > 0, notes: notes.length > 0 ? notes : undefined } : c
+    ) },
   })))),
 }));
 

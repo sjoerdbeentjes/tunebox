@@ -1,25 +1,30 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Meter } from "./primitives";
-import { transpose } from "./primitives";
 import { getModuleDef } from "../registry";
 import type { Step, Track } from "../model/types";
+import { rootOf, transposeChord } from "./chords";
+import { ChordPopover, type ChordPopoverAnchor } from "./ChordPopover";
 
-export function StepGrid({ tracks, step, selectedId, onSelect, onSetStep, onToggleMute, onToggleSolo }: {
+export function StepGrid({ tracks, step, selectedId, onSelect, onSetStep, onSetStepNotes, onToggleMute, onToggleSolo }: {
   tracks: Track[];
   step: number;
   selectedId: string | null;
   onSelect: (id: string) => void;
   onSetStep: (trackId: string, idx: number, step: Step) => void;
+  onSetStepNotes: (trackId: string, idx: number, notes: string[]) => void;
   onToggleMute: (id: string) => void;
   onToggleSolo: (id: string) => void;
 }) {
   // Drum paint state: while mouse held, write the same value across hovered cells.
   const paint = useRef<{ value: boolean } | null>(null);
-  // Melodic drag state: drag a melodic cell vertically to retune.
-  const meldrag = useRef<{ trackId: string; idx: number; startY: number; startNote: string; moved: boolean } | null>(null);
+  // Melodic drag state: drag a melodic cell vertically to retune (transposes whole chord).
+  const meldrag = useRef<{ trackId: string; idx: number; startY: number; startNotes: string[]; moved: boolean } | null>(null);
   // Track stable reference for the mousemove handler.
   const tracksRef = useRef(tracks);
   useEffect(() => { tracksRef.current = tracks; }, [tracks]);
+
+  // Chord popover anchor (right-click / shift+click on a melodic cell).
+  const [chord, setChord] = useState<ChordPopoverAnchor | null>(null);
 
   useEffect(() => {
     const up = () => { paint.current = null; meldrag.current = null; };
@@ -34,27 +39,44 @@ export function StepGrid({ tracks, step, selectedId, onSelect, onSetStep, onTogg
       const dy = d.startY - ev.clientY;
       const semis = Math.round(dy / 10);
       if (Math.abs(dy) > 4) d.moved = true;
-      const next = transpose(d.startNote, semis);
-      const t = tracksRef.current.find((x) => x.id === d.trackId);
-      if (!t) return;
-      const cur = t.pattern.steps[d.idx];
-      onSetStep(d.trackId, d.idx, { active: true, note: next, velocity: cur.velocity ?? 0.9 });
+      const next = transposeChord(d.startNotes, semis);
+      onSetStepNotes(d.trackId, d.idx, next);
     };
     window.addEventListener("mousemove", move);
     return () => window.removeEventListener("mousemove", move);
-  }, [onSetStep]);
+  }, [onSetStepNotes]);
 
   const isMel = (track: Track) => getModuleDef(track.module.type)?.kind === "synth";
 
+  const openChord = (track: Track, idx: number, e: React.MouseEvent) => {
+    if (!isMel(track)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const cur = track.pattern.steps[idx];
+    // If the step is off, activate it with the track's default note so the popover has something to edit.
+    if (!cur.active) {
+      const note = track.defaultNote ?? "C4";
+      onSetStepNotes(track.id, idx, [note]);
+    }
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setChord({ trackId: track.id, index: idx, rect });
+  };
+
   const cellDown = (track: Track, idx: number, e: React.MouseEvent) => {
+    // Right-click or Shift+click on melodic cells opens the chord popover.
+    if (isMel(track) && (e.button === 2 || e.shiftKey)) {
+      openChord(track, idx, e);
+      return;
+    }
     const cur = track.pattern.steps[idx];
     if (isMel(track)) {
       if (!cur.active) {
         const note = track.defaultNote ?? "C4";
-        onSetStep(track.id, idx, { active: true, note, velocity: 0.9 });
-        meldrag.current = { trackId: track.id, idx, startY: e.clientY, startNote: note, moved: false };
+        onSetStepNotes(track.id, idx, [note]);
+        meldrag.current = { trackId: track.id, idx, startY: e.clientY, startNotes: [note], moved: false };
       } else {
-        meldrag.current = { trackId: track.id, idx, startY: e.clientY, startNote: cur.note ?? track.defaultNote ?? "C4", moved: false };
+        const startNotes = cur.notes && cur.notes.length > 0 ? cur.notes : [track.defaultNote ?? "C4"];
+        meldrag.current = { trackId: track.id, idx, startY: e.clientY, startNotes, moved: false };
       }
     } else {
       const nv = !cur.active;
@@ -75,6 +97,10 @@ export function StepGrid({ tracks, step, selectedId, onSelect, onSetStep, onTogg
       if (wasActive) onSetStep(track.id, idx, { active: false });
     }
   };
+
+  const chordTrack = chord ? tracks.find((t) => t.id === chord.trackId) ?? null : null;
+  const chordStep = chord && chordTrack ? chordTrack.pattern.steps[chord.index] : null;
+  const chordNotes = chordStep?.notes ?? (chordStep?.active && chordTrack?.defaultNote ? [chordTrack.defaultNote] : []);
 
   return (
     <div className="seq">
@@ -104,29 +130,55 @@ export function StepGrid({ tracks, step, selectedId, onSelect, onSetStep, onTogg
                 <Meter trackId={t.id} w={4} />
               </div>
               <div className="seq-cells">
-                {t.pattern.steps.map((s, i) => (
-                  <div key={i}
-                    className={
-                      "cell"
-                      + (s.active ? " on" : "")
-                      + (i % 4 === 0 ? " beat" : "")
-                      + (step === i ? " play" : "")
-                      + (mel ? " mel" : "")
-                    }
-                    style={s.active ? ({ ["--cc" as string]: t.color } as React.CSSProperties) : undefined}
-                    onMouseDown={(e) => { e.stopPropagation(); cellDown(t, i, e); }}
-                    onMouseEnter={() => cellEnter(t, i)}
-                    onMouseUp={() => cellUp(t, i)}>
-                    {mel && s.active ? <span className="cell-note">{s.note ?? t.defaultNote ?? ""}</span> : null}
-                    {!mel && s.active ? <span className="cell-dot" /> : null}
-                  </div>
-                ))}
+                {t.pattern.steps.map((s, i) => {
+                  const notes = s.notes ?? (s.active && t.defaultNote ? [t.defaultNote] : []);
+                  const isChord = mel && s.active && notes.length > 1;
+                  const display = mel && s.active ? (notes.length > 0 ? rootOf(notes) : "") : "";
+                  return (
+                    <div key={i}
+                      className={
+                        "cell"
+                        + (s.active ? " on" : "")
+                        + (i % 4 === 0 ? " beat" : "")
+                        + (step === i ? " play" : "")
+                        + (mel ? " mel" : "")
+                        + (isChord ? " chord" : "")
+                      }
+                      style={s.active ? ({ ["--cc" as string]: t.color } as React.CSSProperties) : undefined}
+                      onMouseDown={(e) => { e.stopPropagation(); cellDown(t, i, e); }}
+                      onMouseEnter={() => cellEnter(t, i)}
+                      onMouseUp={() => cellUp(t, i)}
+                      onContextMenu={(e) => { e.preventDefault(); openChord(t, i, e); }}>
+                      {mel && s.active ? (
+                        <span className="cell-note">
+                          {display}
+                          {isChord ? <span className="cell-chord-badge">{notes.length}</span> : null}
+                        </span>
+                      ) : null}
+                      {!mel && s.active ? <span className="cell-dot" /> : null}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
         })}
       </div>
-      <div className="seq-hint">click to toggle · drag across drum cells to paint · drag ▲▼ on melodic cells to pitch</div>
+      <div className="seq-hint">click to toggle · drag across drum cells to paint · drag ▲▼ to retune · right-click (or shift-click) melodic cells for chords</div>
+
+      {chord && chordTrack && (
+        <ChordPopover
+          anchor={chord}
+          notes={chordNotes}
+          color={chordTrack.color}
+          onChange={(next) => {
+            if (next.length === 0) onSetStep(chord.trackId, chord.index, { active: false });
+            else onSetStepNotes(chord.trackId, chord.index, next);
+          }}
+          onClose={() => setChord(null)}
+        />
+      )}
     </div>
   );
 }
+
