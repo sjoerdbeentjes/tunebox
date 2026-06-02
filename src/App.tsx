@@ -15,6 +15,7 @@ import { BootScreen } from "./ui/BootScreen";
 import { Browser } from "./ui/Browser";
 import { Icon } from "./ui/primitives";
 import { Mixer } from "./ui/Mixer";
+import { ProjectPicker } from "./ui/ProjectPicker";
 import { Rack } from "./ui/Rack";
 import { StepGrid } from "./ui/StepGrid";
 import { TitleBar, type View } from "./ui/TitleBar";
@@ -39,6 +40,8 @@ export default function App() {
   const toggleSolo = useProjectStore((s) => s.toggleSolo);
   const setStep = useProjectStore((s) => s.setStep);
   const setStepNotes = useProjectStore((s) => s.setStepNotes);
+  const renameActive = useProjectStore((s) => s.renameActive);
+  const activeSessionId = useProjectStore((s) => s.library.activeId);
 
   const [booted, setBooted] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -48,7 +51,21 @@ export default function App() {
   const [metro, setMetro] = useState(false);
   const [view, setView] = useState<View>("seq");
   const [browserOpen, setBrowserOpen] = useState(true);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(project.tracks[0]?.id ?? null);
+
+  // When the active session changes, drop the selection to the first track of the
+  // new project so the device rack doesn't dangle on a removed id.
+  useEffect(() => {
+    setSelectedId((cur) => {
+      if (cur && project.tracks.some((t) => t.id === cur)) return cur;
+      return project.tracks[0]?.id ?? null;
+    });
+    audioEngine.stop();
+    setPlaying(false);
+    setStepIdx(-1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSessionId]);
 
   // Re-pick a selection if the selected track was removed.
   useEffect(() => {
@@ -119,7 +136,9 @@ export default function App() {
     <div className="app">
       <div className="scanlines" />
       <TitleBar
-        name={project.name} view={view} setView={setView}
+        name={project.name} onRename={renameActive}
+        onOpenPicker={() => setPickerOpen(true)}
+        view={view} setView={setView}
         onAdd={onAddTrack} onDel={onDelTrack}
         canDel={project.tracks.length > 1}
       />
@@ -171,6 +190,7 @@ export default function App() {
           onOpenBrowser={() => setBrowserOpen(true)}
         />
       </div>
+      {pickerOpen && <ProjectPicker onClose={() => setPickerOpen(false)} />}
     </div>
   );
 }
