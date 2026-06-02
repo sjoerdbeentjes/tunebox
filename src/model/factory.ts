@@ -1,8 +1,3 @@
-/**
- * Factory helpers for constructing valid model objects with sensible defaults.
- * Pulls default params straight from the registry so new tracks always start
- * from a valid, playable state.
- */
 import { getEffectDef, getModuleDef } from "../registry/registry";
 import {
   PROJECT_VERSION,
@@ -17,14 +12,13 @@ import {
 } from "./types";
 
 let counter = 0;
-/** Stable-ish id with a readable prefix, e.g. "track-3". */
 export function makeId(prefix: string): string {
   counter += 1;
-  return `${prefix}-${counter}`;
+  return `${prefix}-${counter.toString(36)}`;
 }
 
 export function emptyStep(): Step {
-  return { active: false, notes: [], velocity: 0 };
+  return { active: false };
 }
 
 export function emptyPattern(loop: LoopConfig): Pattern {
@@ -48,29 +42,36 @@ export function createEffect(type: string): Effect {
 }
 
 export function createTrack(opts: {
-  name: string;
+  name?: string;
   moduleType: string;
   loop: LoopConfig;
   id?: string;
 }): Track {
+  const def = getModuleDef(opts.moduleType);
+  if (!def) throw new Error(`Unknown module type "${opts.moduleType}"`);
   return {
     id: opts.id ?? makeId("track"),
-    name: opts.name,
+    name: opts.name ?? def.label,
+    color: def.color,
     module: createModule(opts.moduleType),
     effects: [],
     pattern: emptyPattern(opts.loop),
-    volume: 0,
+    defaultNote: def.defaultNote,
+    vol: 0.8,
     pan: 0,
-    muted: false,
+    mute: false,
+    solo: false,
   };
 }
 
-export function createProject(opts?: Partial<Pick<Project, "name" | "tempo" | "loop">>): Project {
+export function createProject(opts?: Partial<Pick<Project, "name" | "bpm" | "loop" | "swing" | "masterVol">>): Project {
   return {
     version: PROJECT_VERSION,
-    name: opts?.name ?? "Untitled",
-    tempo: opts?.tempo ?? 120,
+    name: opts?.name ?? "untitled.daw",
+    bpm: opts?.bpm ?? 120,
+    swing: opts?.swing ?? 0,
     loop: opts?.loop ?? { bars: 1, stepsPerBar: 16 },
+    masterVol: opts?.masterVol ?? 0.85,
     tracks: [],
   };
 }

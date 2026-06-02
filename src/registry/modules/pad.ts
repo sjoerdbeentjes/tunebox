@@ -5,29 +5,30 @@ import type { ModuleDefinition } from "../types";
 const schema = z.object({});
 type P = z.infer<typeof schema>;
 
-export const synthModule: ModuleDefinition<P> = {
-  type: "synth",
-  label: "SYNTH",
+export const padModule: ModuleDefinition<P> = {
+  type: "pad",
+  label: "PAD",
   kind: "synth",
-  glyph: "⊓",
-  desc: "Square lead synth",
-  color: "var(--amber)",
-  defaultNote: "C4",
+  glyph: "☷",
+  desc: "Detuned saw pad",
+  color: "var(--cyan)",
+  defaultNote: "C3",
   schema,
   defaultParams: {},
 
   create() {
     const poly = new Tone.PolySynth(Tone.Synth);
     poly.set({
-      oscillator: { type: "square" },
-      envelope: { attack: 0.006, decay: 0.45, sustain: 0.25, release: 0.3 },
+      oscillator: { type: "sawtooth" },
+      detune: 8,
+      envelope: { attack: 0.4, decay: 1.0, sustain: 0.6, release: 1.4 },
     });
     return {
       node: poly,
       internal: poly,
       trigger(note, time, velocity, duration) {
         if (!note) return;
-        poly.triggerAttackRelease(note, duration, time, velocity * 0.5);
+        poly.triggerAttackRelease(note, duration, time, velocity * 0.4);
       },
       dispose() { poly.dispose(); },
     };

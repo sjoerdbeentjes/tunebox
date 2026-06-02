@@ -1,59 +1,62 @@
 /**
- * Tunebox core domain model.
+ * Tunebox / Terminal DAW core domain model.
  *
  * The entire project state is a single JSON document. These types describe its
- * shape. They are intentionally stable and plugin-agnostic: the concrete shape
- * of `Module.params` / `Effect.params` is enforced per-`type` by the registry's
- * Zod schemas (see ../model/schema.ts), not here.
+ * shape. Module/effect `params` are validated per-`type` by the registry's Zod
+ * schemas (see ./schema.ts), so the core types stay stable as plugins grow.
  */
 
-/** Current schema version. Bump + add a migration in schema.ts when the shape changes. */
-export const PROJECT_VERSION = 1 as const;
+/** Bumped to v2 when the schema gained per-track color/solo and per-step pitch. */
+export const PROJECT_VERSION = 2 as const;
 
 export interface Project {
-  /** Schema version, used for migrations. */
   version: typeof PROJECT_VERSION;
   name: string;
-  /** Beats per minute for the transport. */
-  tempo: number;
+  /** Beats per minute. */
+  bpm: number;
+  /** Swing amount, 0..0.6 (fraction of a step delay on odd 16ths). */
+  swing: number;
   loop: LoopConfig;
+  /** Master output volume, 0..1 linear. */
+  masterVol: number;
   tracks: Track[];
 }
 
 export interface LoopConfig {
-  /** Number of bars in the loop, e.g. 1. */
   bars: number;
-  /** Steps per bar, e.g. 16 for sixteenth notes in 4/4. Total steps = bars * stepsPerBar. */
   stepsPerBar: number;
 }
 
 export interface Track {
-  /** Stable, human-readable id, e.g. "track-bass". */
   id: string;
   name: string;
+  /** CSS color token used for UI accents, e.g. "var(--grn)". */
+  color: string;
   /** Exactly one sound source. */
   module: Module;
-  /** Ordered processing chain applied after the module. */
+  /** Ordered processing chain. */
   effects: Effect[];
   pattern: Pattern;
-  /** Track gain in dB. 0 = unity. */
-  volume: number;
-  /** Stereo pan, -1 (left) .. 1 (right). */
+  /** UI default pitch for new melodic steps, e.g. "C2". Ignored for drums. */
+  defaultNote?: string;
+  /** Linear volume, 0..1 (engine squares it for taper). */
+  vol: number;
+  /** Stereo pan, -1..1. */
   pan: number;
-  muted: boolean;
+  mute: boolean;
+  solo: boolean;
 }
 
-/** A sound source. `type` selects a ModuleDefinition from the registry. */
 export interface Module {
   type: string;
   params: Record<string, unknown>;
 }
 
-/** An audio processor. `type` selects an EffectDefinition from the registry. */
 export interface Effect {
   id: string;
   type: string;
   params: Record<string, unknown>;
+  bypass?: boolean;
 }
 
 export interface Pattern {
@@ -61,15 +64,22 @@ export interface Pattern {
   steps: Step[];
 }
 
+/**
+ * A single step. Drums: only `active` matters. Melodic: `note` is the pitch
+ * to play (e.g. "C4"); when omitted, the track's `defaultNote` is used.
+ */
 export interface Step {
   active: boolean;
-  /** Notes to trigger, e.g. ["C4", "E4"]. Empty for purely rhythmic hits. */
-  notes: string[];
-  /** Velocity, 0 .. 1. */
-  velocity: number;
+  note?: string;
+  /** 0..1, defaults to 0.95 when omitted. */
+  velocity?: number;
 }
 
-/** Total number of steps in a loop. */
 export function totalSteps(loop: LoopConfig): number {
   return loop.bars * loop.stepsPerBar;
+}
+
+/** Convenience: velocity with default. */
+export function stepVelocity(step: Step): number {
+  return step.velocity ?? 0.95;
 }

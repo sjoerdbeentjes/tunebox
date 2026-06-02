@@ -1,58 +1,76 @@
 /**
- * Plugin definition interfaces.
- *
- * A module (instrument) or effect (processor) is registered as a single
- * definition object. Adding a new instrument/effect to Tunebox means writing
- * one of these and calling registerModule/registerEffect once — nothing else in
- * the engine, store, types, or validation needs to change.
+ * Plugin definition interfaces. A new instrument or effect is a single
+ * definition object — registry-driven so the engine, UI browser, and schema
+ * validator all discover it without any other code changes.
  */
 import type * as Tone from "tone";
 import type { z } from "zod";
 
 /**
- * Triggers one step of a module.
- * @param notes     Notes to play, e.g. ["C4"]. May be empty for rhythmic hits.
- * @param time      Tone.js transport time to schedule at (seconds).
- * @param velocity  0 .. 1.
+ * Triggers one step of a module at a scheduled transport time.
+ * @param note      Pitch as a Tone-compatible string ("C4"), or undefined for drums.
+ * @param time      Web Audio time (seconds).
+ * @param velocity  0..1.
  * @param duration  Note length in seconds.
  */
 export type TriggerFn = (
-  notes: string[],
+  note: string | undefined,
   time: number,
   velocity: number,
   duration: number,
 ) => void;
 
-/** Runtime handle returned by ModuleDefinition.create — owns the audio node + trigger. */
 export interface ModuleHandle {
   /** The node that feeds into the effect chain / channel. */
   node: Tone.ToneAudioNode;
   trigger: TriggerFn;
-  /** Plugin-private state (e.g. the underlying synth) for use by update(). */
+  /** Plugin-private state for use by update(). */
   internal: unknown;
   dispose(): void;
+}
+
+/** Param definition for UI auto-rendering (knob/enum) and value formatting. */
+export interface ParamSpec {
+  key: string;
+  label: string;
+  kind?: "number" | "enum";
+  min?: number;
+  max?: number;
+  step?: number;
+  default: unknown;
+  unit?: string;
+  options?: string[];
 }
 
 export interface ModuleDefinition<P = Record<string, unknown>> {
   /** Discriminator stored as Module.type in the JSON. */
   type: string;
-  /** Human-readable name for UI. */
   label: string;
-  /** Validates + types Module.params for this type. */
+  /** "drum" = one-shot percussion, "synth" = pitched. */
+  kind: "drum" | "synth";
+  /** Single glyph for the catalog/title rows. */
+  glyph: string;
+  /** Short description shown in the browser footer. */
+  desc: string;
+  /** Color hint (CSS var) used as the default track color when added. */
+  color: string;
+  /** Default note for melodic modules, e.g. "C4". */
+  defaultNote?: string;
   schema: z.ZodType<P>;
-  /** Params used when creating a fresh instance of this module. */
   defaultParams: P;
-  /** Build the audio node + trigger fn. */
   create(params: P): ModuleHandle;
-  /** Apply changed params without rebuilding the node, when possible. */
   update(handle: ModuleHandle, params: P): void;
 }
 
 export interface EffectDefinition<P = Record<string, unknown>> {
   type: string;
   label: string;
+  glyph: string;
+  desc: string;
   schema: z.ZodType<P>;
   defaultParams: P;
+  /** UI param specs (for auto-rendering knobs in the rack). */
+  params: ParamSpec[];
   create(params: P): Tone.ToneAudioNode;
   update(node: Tone.ToneAudioNode, params: P): void;
 }

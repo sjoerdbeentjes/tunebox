@@ -1,170 +1,175 @@
+/**
+ * Terminal DAW app shell — composes the title bar, transport, browser, main
+ * view (SEQ/MIX), and the bottom device rack. Boot screen runs first.
+ *
+ * State flow: useProjectStore is the JSON source of truth. The AudioEngine is
+ * connected to the store in main.tsx and reconciles itself on every change.
+ * This component only reads the store and dispatches actions; it never touches
+ * Tone.js directly.
+ */
 import { useEffect, useState } from "react";
-import { audioEngine } from "./engine/AudioEngine";
-import { connectEngine } from "./engine/connectEngine";
-import { createTrack } from "./model/factory";
+import * as Tone from "tone";
+import { audioEngine, onStep } from "./engine/AudioEngine";
 import { useProjectStore } from "./store/useProjectStore";
+import { BootScreen } from "./ui/BootScreen";
+import { Browser } from "./ui/Browser";
+import { Icon } from "./ui/primitives";
+import { Mixer } from "./ui/Mixer";
+import { Rack } from "./ui/Rack";
+import { StepGrid } from "./ui/StepGrid";
+import { TitleBar, type View } from "./ui/TitleBar";
+import { Transport } from "./ui/Transport";
 
 export default function App() {
   const project = useProjectStore((s) => s.project);
-  const setTempo = useProjectStore((s) => s.setTempo);
-  const toggleStep = useProjectStore((s) => s.toggleStep);
+  const setBpm = useProjectStore((s) => s.setBpm);
+  const setSwing = useProjectStore((s) => s.setSwing);
+  const setMasterVolStore = useProjectStore((s) => s.setMasterVol);
   const addTrack = useProjectStore((s) => s.addTrack);
-  const exportJSON = useProjectStore((s) => s.exportJSON);
+  const removeTrack = useProjectStore((s) => s.removeTrack);
+  const selectModule = useProjectStore((s) => s.selectModule);
+  const appendEffect = useProjectStore((s) => s.appendEffect);
+  const removeEffect = useProjectStore((s) => s.removeEffect);
+  const toggleBypass = useProjectStore((s) => s.toggleEffectBypass);
+  const moveEffect = useProjectStore((s) => s.moveEffect);
+  const updateEffectParam = useProjectStore((s) => s.updateEffectParam);
+  const setTrack = useProjectStore((s) => s.setTrack);
+  const setDefaultNote = useProjectStore((s) => s.setDefaultNote);
+  const toggleMute = useProjectStore((s) => s.toggleMute);
+  const toggleSolo = useProjectStore((s) => s.toggleSolo);
+  const setStep = useProjectStore((s) => s.setStep);
 
+  const [booted, setBooted] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const [step, setStepIdx] = useState(-1);
+  const [rec, setRec] = useState(false);
+  const [loop, setLoop] = useState(true);
+  const [metro, setMetro] = useState(false);
+  const [view, setView] = useState<View>("seq");
+  const [browserOpen, setBrowserOpen] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(project.tracks[0]?.id ?? null);
 
-  // Wire the engine to the store once, on mount.
+  // Re-pick a selection if the selected track was removed.
   useEffect(() => {
-    connectEngine();
-  }, []);
+    if (!project.tracks.some((t) => t.id === selectedId)) {
+      setSelectedId(project.tracks[0]?.id ?? null);
+    }
+  }, [project.tracks, selectedId]);
 
-  async function handlePlay() {
-    await audioEngine.init(); // resume AudioContext from this user gesture
-    audioEngine.play();
-    setPlaying(true);
-  }
+  // Subscribe to audio-thread step callbacks for the playhead.
+  useEffect(() => onStep(setStepIdx), []);
 
-  function handleStop() {
-    audioEngine.stop();
-    setPlaying(false);
-  }
+  // Wire transport features that live on the engine, not in the JSON model.
+  useEffect(() => { audioEngine.setMetronome(metro); }, [metro]);
+  useEffect(() => {
+    const tp = Tone.getTransport();
+    tp.loop = loop;
+    tp.loopStart = 0;
+    tp.loopEnd = `${project.loop.bars}m`;
+  }, [loop, project.loop.bars]);
 
-  function handleAddTrack() {
-    addTrack(createTrack({ name: `Track ${project.tracks.length + 1}`, moduleType: "synth", loop: project.loop }));
-  }
+  // Keyboard: space toggles play, m/s on selected track.
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      if (e.code === "Space") { e.preventDefault(); onToggle(); return; }
+      if (e.key === "m" && selectedId) toggleMute(selectedId);
+      if (e.key === "s" && selectedId) toggleSolo(selectedId);
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
 
-  function handleExport() {
-    const json = exportJSON();
-    console.log(json);
-    void navigator.clipboard?.writeText(json).catch(() => {});
-  }
+  const onToggle = async () => {
+    if (audioEngine.isPlaying) {
+      audioEngine.stop();
+      setPlaying(false);
+      setStepIdx(-1);
+    } else {
+      await audioEngine.init();
+      audioEngine.play();
+      setPlaying(true);
+    }
+  };
+  const onStop = () => { audioEngine.stop(); setPlaying(false); setStepIdx(-1); };
+
+  const onAddTrack = () => {
+    const id = addTrack("synth");
+    setSelectedId(id);
+  };
+  const onDelTrack = () => { if (selectedId) removeTrack(selectedId); };
+
+  const onAddInstrument = (type: string) => {
+    if (!selectedId) return;
+    selectModule(selectedId, type);
+  };
+  const onAddEffect = (type: string) => {
+    if (!selectedId) return;
+    appendEffect(selectedId, type);
+  };
+
+  const selTrack = project.tracks.find((t) => t.id === selectedId) ?? null;
+
+  if (!booted) return <BootScreen onDone={() => setBooted(true)} />;
 
   return (
-    <main style={styles.main}>
-      <header style={styles.header}>
-        <h1 style={{ margin: 0 }}>🎛️ Tunebox</h1>
-        <span style={styles.subtitle}>{project.name}</span>
-      </header>
-
-      <section style={styles.transport}>
-        {playing ? (
-          <button style={styles.btn} onClick={handleStop}>■ Stop</button>
-        ) : (
-          <button style={styles.btn} onClick={handlePlay}>▶ Play</button>
-        )}
-        <label style={styles.tempo}>
-          Tempo
-          <input
-            type="number"
-            min={40}
-            max={240}
-            value={project.tempo}
-            onChange={(e) => setTempo(Number(e.target.value))}
-            style={styles.tempoInput}
-          />
-          BPM
-        </label>
-        <button style={styles.btnGhost} onClick={handleAddTrack}>+ Add track</button>
-        <button style={styles.btnGhost} onClick={handleExport}>Export JSON</button>
-      </section>
-
-      <section style={styles.tracks}>
-        {project.tracks.map((track) => (
-          <div key={track.id} style={styles.track}>
-            <div style={styles.trackHead}>
-              <strong>{track.name}</strong>
-              <span style={styles.tag}>{track.module.type}</span>
-              {track.effects.map((fx) => (
-                <span key={fx.id} style={styles.tag}>{fx.type}</span>
-              ))}
-            </div>
-            <div style={styles.steps}>
-              {track.pattern.steps.map((step, i) => (
-                <button
-                  key={i}
-                  onClick={() => toggleStep(track.id, i)}
-                  title={step.notes.join(", ")}
-                  style={{
-                    ...styles.step,
-                    ...(step.active ? styles.stepOn : null),
-                    ...(i % 4 === 0 ? styles.stepBeat : null),
-                  }}
-                >
-                  {step.notes[0] ?? ""}
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </section>
-
-      <p style={styles.hint}>
-        Click steps to toggle them. Export logs the full project JSON to the console (and copies it).
-      </p>
-    </main>
+    <div className="app">
+      <div className="scanlines" />
+      <TitleBar
+        name={project.name} view={view} setView={setView}
+        onAdd={onAddTrack} onDel={onDelTrack}
+        canDel={project.tracks.length > 1}
+      />
+      <Transport
+        playing={playing} onToggle={onToggle} onStop={onStop} rec={rec} setRec={setRec}
+        bpm={project.bpm} setBpm={setBpm}
+        swing={project.swing} setSwing={setSwing}
+        metro={metro} setMetro={setMetro} loop={loop} setLoop={setLoop}
+        step={step}
+        masterVol={project.masterVol} setMasterVol={setMasterVolStore}
+      />
+      <div className="workspace">
+        <Browser
+          open={browserOpen} onToggle={() => setBrowserOpen((o) => !o)}
+          onSelectModule={onAddInstrument} onAddEffect={onAddEffect}
+          selTrack={selTrack}
+        />
+        <div className="main-view">
+          {view === "seq" ? (
+            <StepGrid
+              tracks={project.tracks} step={step} selectedId={selectedId}
+              onSelect={setSelectedId} onSetStep={setStep}
+              onToggleMute={toggleMute} onToggleSolo={toggleSolo}
+            />
+          ) : (
+            <Mixer
+              tracks={project.tracks} selectedId={selectedId}
+              onSelect={setSelectedId}
+              onChange={(id, patch) => setTrack(id, patch)}
+              onToggleMute={toggleMute} onToggleSolo={toggleSolo}
+              masterVol={project.masterVol} setMasterVol={setMasterVolStore}
+            />
+          )}
+        </div>
+      </div>
+      <div className="dock">
+        <div className="dock-head">
+          <span className="dock-title"><Icon name="cpu" size={12} /> DEVICE RACK</span>
+          {selTrack && <span className="dock-track" style={{ color: selTrack.color }}>[ {selTrack.name} ]</span>}
+          <span className="dock-chain">{selTrack ? (1 + selTrack.effects.length) + " modules" : ""}</span>
+        </div>
+        <Rack
+          track={selTrack}
+          onSetDefaultNote={setDefaultNote}
+          onParam={updateEffectParam}
+          onRemove={removeEffect}
+          onBypass={toggleBypass}
+          onMove={moveEffect}
+          onOpenBrowser={() => setBrowserOpen(true)}
+        />
+      </div>
+    </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  main: {
-    fontFamily: "system-ui, sans-serif",
-    maxWidth: 900,
-    margin: "0 auto",
-    padding: 24,
-    color: "#e7e7ea",
-    background: "#15151a",
-    minHeight: "100vh",
-  },
-  header: { display: "flex", alignItems: "baseline", gap: 12, marginBottom: 16 },
-  subtitle: { color: "#9a9aa5" },
-  transport: { display: "flex", alignItems: "center", gap: 12, marginBottom: 24, flexWrap: "wrap" },
-  btn: {
-    background: "#6c5ce7",
-    color: "white",
-    border: "none",
-    borderRadius: 8,
-    padding: "10px 18px",
-    fontSize: 16,
-    cursor: "pointer",
-  },
-  btnGhost: {
-    background: "transparent",
-    color: "#c7c7d1",
-    border: "1px solid #3a3a45",
-    borderRadius: 8,
-    padding: "8px 14px",
-    cursor: "pointer",
-  },
-  tempo: { display: "flex", alignItems: "center", gap: 6, color: "#9a9aa5" },
-  tempoInput: {
-    width: 64,
-    background: "#22222b",
-    color: "#e7e7ea",
-    border: "1px solid #3a3a45",
-    borderRadius: 6,
-    padding: "6px 8px",
-  },
-  tracks: { display: "flex", flexDirection: "column", gap: 16 },
-  track: { background: "#1d1d25", borderRadius: 12, padding: 16 },
-  trackHead: { display: "flex", alignItems: "center", gap: 8, marginBottom: 12 },
-  tag: {
-    fontSize: 12,
-    background: "#2c2c38",
-    color: "#a8a8ff",
-    borderRadius: 999,
-    padding: "2px 10px",
-  },
-  steps: { display: "grid", gridTemplateColumns: "repeat(16, 1fr)", gap: 4 },
-  step: {
-    aspectRatio: "1",
-    background: "#26262f",
-    border: "1px solid #33333f",
-    borderRadius: 6,
-    color: "#7a7a88",
-    fontSize: 10,
-    cursor: "pointer",
-  },
-  stepOn: { background: "#6c5ce7", color: "white", borderColor: "#6c5ce7" },
-  stepBeat: { borderColor: "#4a4a58" },
-  hint: { color: "#71717f", marginTop: 24, fontSize: 13 },
-};

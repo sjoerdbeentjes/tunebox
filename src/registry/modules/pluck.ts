@@ -5,22 +5,22 @@ import type { ModuleDefinition } from "../types";
 const schema = z.object({});
 type P = z.infer<typeof schema>;
 
-export const synthModule: ModuleDefinition<P> = {
-  type: "synth",
-  label: "SYNTH",
+export const pluckModule: ModuleDefinition<P> = {
+  type: "pluck",
+  label: "PLUCK",
   kind: "synth",
-  glyph: "⊓",
-  desc: "Square lead synth",
+  glyph: "◺",
+  desc: "Short triangle pluck",
   color: "var(--amber)",
-  defaultNote: "C4",
+  defaultNote: "E4",
   schema,
   defaultParams: {},
 
   create() {
     const poly = new Tone.PolySynth(Tone.Synth);
     poly.set({
-      oscillator: { type: "square" },
-      envelope: { attack: 0.006, decay: 0.45, sustain: 0.25, release: 0.3 },
+      oscillator: { type: "triangle" },
+      envelope: { attack: 0.002, decay: 0.22, sustain: 0, release: 0.1 },
     });
     return {
       node: poly,
